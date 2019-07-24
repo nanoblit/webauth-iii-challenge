@@ -1,18 +1,38 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const db = require('./data/db');
 
 const app = express();
 app.use(express.json());
 
+function generateToken(user) {
+  const payload = {
+    sub: user.id,
+    username: user.name,
+  };
+
+  const options = {
+    expiresIn: '1d',
+  };
+
+  return jwt.sign(payload, 'Some sweet secret', options);
+}
+
 function restricted(req, res, next) {
-  // Do some jwt stuff
-  // if () {
-  //   next();
-  // } else {
-  //   res.status(400).json({ message: 'No credentials provided' });
-  // }
-  next();
+  const token = req.headers.authorization;
+  if (token) {
+    jwt.verify(token, 'Some sweet secret', (err, decodedToken) => {
+      if (err) {
+        res.status(401).json({ error: 'User not verified' });
+      } else {
+        req.decodedToken = decodedToken;
+        next();
+      }
+    });
+  } else {
+    res.status(401).json({ error: 'You shall not pass!' });
+  }
 }
 
 async function checkCredentialsInBody(req, res, next) {
@@ -57,7 +77,8 @@ app.post('/api/register', async (req, res, next) => {
 
 app.post('/api/login', checkCredentialsInBody, (req, res, next) => {
   // Do some jwt stuff
-  res.status(200).json('Logged in');
+  const token = generateToken(req.body);
+  res.status(200).json({ message: 'Logged in', token });
 });
 
 app.use((err, req, res) => {
